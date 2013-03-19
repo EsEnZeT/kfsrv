@@ -1,0 +1,135 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          KF_Server
+# Required-Start:    $local_fs $remote_fs $network $syslog
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: KF_Server
+# Description:       KF_Server
+### END INIT INFO
+
+# Author: SnZ <snz@spinacz.org> ~ http://spinacz.org
+# License: Released under the GPL license (http://www.gnu.org/copyleft/gpl.html)
+
+# Server options
+TITLE='Killing Floor Server'                                     # Script title
+NAME='kfsrv'                                                     # Name for screen session
+LOADER='loader.sh'                                               # Server loader
+DIR='/home/kf'                                                   # User dir
+KFBIN='/home/kf/Server/System'                                   # Game path
+USER='kf'                                                        # Server user
+sUSER=''                                                         # Steam user
+sPASS=''                                                         # Steam password
+INI='kfsrv.ini'                                                  # Server configuration file
+
+# ps column fix
+export COLUMNS=350
+
+# Screen options
+SCREEN="/usr/bin/screen -c $DIR/.mscreen.conf -AmdS $NAME"
+
+service_start() {
+    # Check if the PID file currently exist
+    if [ ! -f $DIR/.$NAME-pid.pid ]; then
+        if [ -x $KFBIN/$LOADER ]; then
+            echo "[!] Starting $TITLE..."
+            sudo su - $USER -c "cd $KFBIN; $SCREEN ./$LOADER"
+            # Prevent race condition on SMP kernels
+            sleep 3
+            # Find and write server PID
+            ps -ef | grep SCREEN | grep "$NAME" | grep -v grep | awk '{print $2}' > $DIR/.$NAME-pid.pid
+            echo "[+] PID written to $DIR/.$NAME-pid.pid"
+            echo "[+] $TITLE started!"
+        fi
+    else
+        echo "[-] Cannot start $TITLE - already running."
+    fi
+}
+
+service_stop() {
+    if [ -f $DIR/.$NAME-pid.pid ]; then
+        echo "[!] Stopping $TITLE..."
+        # Get PID created earlier
+        for num in `cat $DIR/.$NAME-pid.pid`
+            do sudo kill -9 $num
+            echo "[+] Killing process ID: $num"
+        done
+        # Remove PID file
+        echo "[+] Removing PID file"
+        sudo rm -rf $DIR/.$NAME-pid.pid
+        # Wipe all old screen sessions
+        sudo su - $USER -c "screen -wipe" > /dev/null 2>&1
+        echo "[+] $TITLE stopped."
+    else
+        echo "[-] Cannot stop $TITLE - not running."
+    fi
+}
+
+service_update() {
+    echo "[!] Commencing $TITLE update..."
+    sudo su - $USER -c "cd $DIR/SteamCMD; ./steamcmd.sh +login $sUSER $sPASS +force_install_dir ../Server +app_update 215360 validate +logout +exit"
+}
+
+service_pwd() {
+    if [ -n "$2" ]; then
+        echo "[?] Closing server - pass = $2"
+        sed -i "s/GamePassword=.*/GamePassword=$2/g" $KFBIN/$INI
+    else
+        echo "[?] Opening server - removing pass"
+        sed -i "s/GamePassword=.*/GamePassword=/g" $KFBIN/$INI
+    fi
+}
+
+service_pwdc() {
+    pwd=$(cat $KFBIN/$INI | grep -Eio 'GamePassword=.*' | sed 's/GamePassword=//g')
+    if [ -n "$pwd" ]; then
+        echo "[?] Password = $pwd"
+    else
+        echo "[?] Password not set!"
+    fi
+}
+
+service_status() {
+    if [ -f $DIR/.$NAME-pid.pid ]; then
+        echo "[+] $TITLE is running"
+        echo "[+] screen -rS $USER/$NAME"
+    else
+        echo "[-] $TITLE is not running."
+    fi
+}
+
+case "$1" in
+    'start')
+        service_start
+        ;;
+    'stop')
+        service_stop
+        ;;
+    'restart')
+        service_stop
+        service_start
+        ;;
+    'update')
+        service_stop
+        sleep 1
+        service_update
+        ;;
+    'pwd')
+        service_stop
+        sleep 1
+        service_pwd $1 $2
+        sleep 1
+        service_start
+        ;;
+    'pwdc')
+        service_pwdc
+        ;;
+    'status')
+        service_status
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|update|pwd <?>|pwdc|status}" >&2
+esac
+
+
