@@ -55,7 +55,7 @@ mv kfsrv /etc/init.d/
 
 Auto start on boot
 ```bash
-update-rc.d kfsrv1 defaults
+update-rc.d kfsrv defaults
 ```
 
 Auto updates at 7am `crontab -e`
