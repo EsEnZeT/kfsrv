@@ -106,3 +106,4 @@ Usage: ./kfsrv {start|stop|restart|update|pwd <?>|pwdc|status}
 ## License
 Released under the GPL license (http://www.gnu.org/copyleft/gpl.html).
 
+![githalytics.com alpha](https://cruel-carlota.pagodabox.com/59eefd3908ba02bc13ef548c28b71261 "githalytics.com")
